@@ -1,0 +1,14 @@
+# Local browser profiles, screenshots, and installation records
+.browser-qa/
+.chrome*/
+qa-*.png
+install-plan.json
+installation.json
+*.backup-*
+*.native-backup-*
+node_modules/
+*.log
+.env
+.env.*
+.DS_Store
+Thumbs.db
