@@ -1,3 +1,4 @@
+import { selectArticleContext } from './context.mjs';
 export const STORE = 'between_lines_v1';
 export const PREFERENCES = 'between_lines_preferences_v1';
 export const CATEGORIES = { term: 'Термины', faction: 'Организации', place: 'Места', custom: 'Обычаи', item: 'Предметы', history: 'История', character: 'Персонажи' };
@@ -162,14 +163,14 @@ export function storeRecord(message, record) {
     message.swipe_info[swipe].extra[STORE] = structuredClone(saved);
   }
 }
-export function collectionInput(chat, target, known, rawPreferences) {
+export function collectionInput(chat, target, known, rawPreferences, focus = '') {
   const settings = preferences(rawPreferences); const messages = [];
   for (let id = target; id >= 0 && messages.length < settings.window; id--) {
     const message = chat[id];
     if (message.is_system || !String(message.mes || '').trim()) continue;
     messages.unshift({ id, role: message.is_user ? 'player' : 'character', name: trimmed(message.name, 120), text: String(message.mes) });
   }
-  return { targetMessageId: target, profile: collectionProfile(settings), messages, existingArticles: known.map(article => ({ id: article.id, name: article.name, aliases: article.aliases, category: article.category, definition: article.definition, facts: article.facts.map(fact => ({ text: fact.text, kind: fact.kind })) })) };
+  return { targetMessageId: target, profile: collectionProfile(settings), messages, ...selectArticleContext(known, messages, focus) };
 }
 function field(value, label, max, required = false) {
   if (typeof value !== 'string' || value.trim().length > max || (required && !value.trim())) throw Error(`Неверное поле «${label}» в ответе сборщика.`);
@@ -180,14 +181,14 @@ export function decodeCollection(raw, input) {
   try { object = JSON.parse(String(raw).trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')); }
   catch { throw Error('Сборщик вернул некорректный JSON. Сохранённый кодекс не изменён.'); }
   if (!object || !Array.isArray(object.articles) || object.articles.length > 12 || !Array.isArray(object.terms) || object.terms.length > 8) throw Error('Ответ должен содержать articles (до 12) и terms (до 8).');
-  const sourceIds = new Set(input.messages.map(message => message.id));
+  const sourceIds = new Set(input.requestMessageIds ?? input.messages.map(message => message.id));
   const articles = object.articles.map(row => {
     if (!row || !Object.hasOwn(CATEGORIES, row.category)) throw Error('Неизвестная категория записи.');
     if (!Array.isArray(row.facts) || row.facts.length < 1 || row.facts.length > 10) throw Error('В статье должны быть 1–10 подтверждающих сведений.');
     const facts = row.facts.map(fact => {
       if (!fact || !['chat', 'lorebook', 'canon', 'inference'].includes(fact.kind)) throw Error('Неверный тип источника.');
       if (fact.kind === 'canon' && !input.profile.allowCanon) throw Error('Дополнение каноном не разрешено в настройках.');
-      if (fact.kind === 'lorebook' && !input.profile.allowLorebook) throw Error('Сведения лорбука не разрешены в настройках.');
+      if (fact.kind === 'lorebook' && (!input.profile.allowLorebook || input.requestHasLorebook === false)) throw Error('Сведения лорбука отсутствуют в запросе или не разрешены в настройках.');
       if (fact.kind === 'chat' && (!Number.isInteger(fact.source) || !sourceIds.has(fact.source))) throw Error('Сборщик указал несуществующее сообщение-источник.');
       return { text: field(fact.text, 'fact', 1500, true), kind: fact.kind, source: fact.kind === 'chat' ? fact.source : null };
     });

@@ -1,6 +1,6 @@
 class BetweenLinesApp {
   constructor(environment, core, style) {
-    this.env = environment; this.core = core; this.style = style; this.version = '2.1.1';
+    this.env = environment; this.core = core; this.style = style; this.version = '2.2.1';
     this.search = ''; this.scope = 'all'; this.category = 'all'; this.selected = null;
     this.expanded = new Map(); this.epoch = 0; this.status = 'Справочник по вашему миру';
   }
