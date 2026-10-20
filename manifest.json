@@ -6,7 +6,7 @@
   "js": "index.js",
   "css": "style.css",
   "author": "huareyu",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "auto_update": false,
   "homePage": "https://github.com/huareyu/between_lines",
   "description": "Самостоятельный кодекс мира: статьи, термины и голоса мира с выбором профиля подключения."

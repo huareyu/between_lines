@@ -1,6 +1,6 @@
 class BetweenLinesApp {
   constructor(environment, core, style) {
-    this.env = environment; this.core = core; this.style = style; this.version = '2.0.0';
+    this.env = environment; this.core = core; this.style = style; this.version = '2.1.0';
     this.search = ''; this.scope = 'all'; this.category = 'all'; this.selected = null;
     this.expanded = new Map(); this.epoch = 0; this.status = 'Справочник по вашему миру';
   }
@@ -11,7 +11,10 @@ class BetweenLinesApp {
   settings() { return this.core.preferences(this.context().chatMetadata?.[this.core.PREFERENCES]); }
   saveSettings(settings) {
     if (!this.hasChat()) return;
+    const previous = this.settings();
     this.context().chatMetadata[this.core.PREFERENCES] = this.core.preferences(settings);
+    const next = this.settings();
+    if (previous.autoEvery !== next.autoEvery || previous.auto !== next.auto) this.env.resetAutoCollection?.();
     this.context().saveMetadataDebounced?.();
   }
   escape(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -310,6 +313,11 @@ class BetweenLinesApp {
     const language = dialog.querySelector('#bl-language'), custom = dialog.querySelector('[name=customLanguage]');
     const connectionSection = document.createElement('section'); connectionSection.className = 'bl-connection-section';
     connectionSection.innerHTML = this.connectionControlsHTML(); dialog.querySelector('header').after(connectionSection);
+    const cadence = document.createElement('label'); cadence.className = 'bl-auto-every';
+    cadence.innerHTML = `Собирать каждые N ответов персонажа<input name="autoEvery" type="number" min="1" max="100" step="1" required value="${prefs.autoEvery}"><span class="bl-help">1 — после каждого ответа, 3 — после каждого третьего. Счётчик отдельный для этого чата. Кнопка «Обновить» запускает сбор сразу. Объём прочитанной истории задаёт «Окно сбора».</span>`;
+    const autoToggle = dialog.querySelector('[name=auto]'); autoToggle.closest('label').after(cadence);
+    const syncAuto = () => { cadence.querySelector('input').disabled = !autoToggle.checked; };
+    autoToggle.addEventListener('change', syncAuto); syncAuto();
     const sync = () => { const visible = language.value === 'custom'; dialog.querySelector('#bl-custom-label').hidden = !visible; custom.disabled = !visible; custom.required = visible; custom.setCustomValidity(''); };
     language.addEventListener('change', sync); custom.addEventListener('input', () => custom.setCustomValidity('')); sync();
     dialog.querySelectorAll('[data-cancel]').forEach(button => button.addEventListener('click', () => dialog.close()));
@@ -322,6 +330,7 @@ class BetweenLinesApp {
       for (const name of ['language', 'fandom', 'spoilerBoundary', 'character']) next[name] = String(data.get(name) || '');
       if (language.value === 'custom') next.customLanguage = String(data.get('customLanguage') || '');
       next.window = Number(data.get('window'));
+      next.autoEvery = Number(dialog.querySelector('[name=autoEvery]').value);
       for (const name of ['auto', 'showTerms', 'lorebook', 'canon']) next[name] = data.has(name);
       this.saveSettings(next); dialog.close(); this.refresh();
     });
@@ -347,6 +356,7 @@ class BetweenLinesApp {
       if (!this.enabled() || (!manual && !currentPrefs.auto) || profileKey !== core.hash(JSON.stringify({ profile: core.collectionProfile(currentPrefs), window: currentPrefs.window }))) { this.status = 'Настройки изменились: обновите кодекс с выбранным языком.'; return false; }
       const result = core.integrate(known, core.decodeCollection(raw, input), target, ledger.deletedArticles);
       await this.commitArticles(session, { articles: result.articles, deletedArticles: ledger.deletedArticles }, { scene: target, terms: result.terms, profileKey, language: input.profile.outputLanguage });
+      if (key === this.chatKey() && epoch === this.epoch) this.env.collectionSaved?.(target);
       this.status = result.added ? `Новых статей: ${result.added}` : 'Справка к сцене обновлена';
       return true;
     } catch (error) { this.notify(error.message || 'Не удалось собрать сведения.', true); return false; }

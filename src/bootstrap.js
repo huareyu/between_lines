@@ -30,7 +30,11 @@ export function startBetweenLines({ context, service }) {
   const c = context(), events = c.eventTypes || c.event_types;
   migrateLegacy(c);
   const connection = new CodexConnection(context, service, PROMPTS);
-  const env = { context, connection, request: (operation, input) => connection.request(operation, input), isEnabled: () => connection.settings().enabled };
+  const saveAutoState = state => { context().chatMetadata[CORE.AUTO_STATE] = state; context().saveMetadataDebounced?.(); };
+  const env = { context, connection, request: (operation, input) => connection.request(operation, input), isEnabled: () => connection.settings().enabled,
+    resetAutoCollection: () => saveAutoState({ every: CORE.preferences(context().chatMetadata?.[CORE.PREFERENCES]).autoEvery, frames: [] }),
+    collectionSaved: target => saveAutoState(CORE.markAutoCollected(context().chat, target, context().chatMetadata?.[CORE.AUTO_STATE], CORE.preferences(context().chatMetadata?.[CORE.PREFERENCES]).autoEvery)),
+  };
   const app = new BetweenLinesApp(env, CORE, STYLES); app.nativeExtension = true;
   globalThis.__betweenLinesApp = app; app.mount(); app.setupExtensionSettings();
   if (!connection.settings().profileId) app.notify('Выберите профиль подключения в настройках кодекса.');
@@ -41,6 +45,9 @@ export function startBetweenLines({ context, service }) {
     const chat = context().chat || [], message = chat[next.id];
     if (next.key !== app.chatKey() || message !== next.message || message?.mes !== next.text || message?.is_user || message?.is_system) return;
     if (!app.enabled() || !app.settings().auto || !connection.settings().profileId) return;
+    const plan = CORE.planAutoCollection(chat, next.id, context().chatMetadata?.[CORE.AUTO_STATE], app.settings().autoEvery);
+    if (plan.counted) saveAutoState(plan.state);
+    if (!plan.due) return;
     void app.collect(next.id);
   };
   if (events.GENERATION_STARTED) c.eventSource.on(events.GENERATION_STARTED, () => { generationActive = true; });

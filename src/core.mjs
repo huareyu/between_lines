@@ -16,6 +16,7 @@ export function preferences(raw = {}) {
   const language = Object.hasOwn(LANGUAGES, raw.language || '') || raw.language === 'custom' ? raw.language : 'ru';
   return {
     language, customLanguage: trimmed(raw.customLanguage, 80), auto: raw.auto !== false, showTerms: raw.showTerms !== false,
+    autoEvery: Number.isFinite(Number(raw.autoEvery)) ? Math.max(1, Math.min(100, Math.round(Number(raw.autoEvery)))) : 1,
     window: Number.isFinite(Number(raw.window)) ? Math.max(1, Math.min(100, Math.round(Number(raw.window)))) : 12,
     canon: raw.canon === true, lorebook: raw.lorebook !== false, fandom: trimmed(raw.fandom, 200),
     spoilerBoundary: trimmed(raw.spoilerBoundary, 600), character: trimmed(raw.character, 1200),
